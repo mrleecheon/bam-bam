@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>뱀뱀이 (BAMBAMI)</title>
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* 기본 여백 제거 */
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f3f1;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ============================================
+    // 💬 일반 응답 대사 (60개)
+    // ============================================
+    const TALK_LINES = [
+      "오늘 하루 어땠어?", "너 오니까 좋다", "심호흡 한 번 같이 할까?", "괜찮아, 천천히 해도 돼",
+      "냐앙~ (오늘은 고양이 흉내)", "골골골... 행복해", "조금 쉬어도 돼", "네 잘못 아니야",
+      "오늘도 잘 버텼어", "여기 와줘서 고마워", "있는 그대로의 너가 좋아", "무리하지 마, 응?",
+      "조금만 쉬었다 가자", "너는 너로 충분해", "오늘 밥은 먹었어?", "물 한 잔 마시고 올래?",
+      "어깨에 힘 좀 빼볼까?", "느려도 괜찮아", "냐옹~ 머리 쓰다듬어줄게", "너 진짜 잘하고 있어",
+      "잠깐, 하늘 한 번 봐봐", "기지개 한 번 펴볼래?", "오늘은 어떤 색이었어?", "마음이 무거워 보여",
+      "안아줄까? 폭신하게", "우리 같이 멍 때리자", "골골... 옆에 있을게", "별 거 아니어도 괜찮아",
+      "넌 정말 소중한 사람이야", "조금 울어도 돼", "냐앙~ 오늘은 너 차례", "내가 들어줄게, 천천히",
+      "고민이 많구나... 알아", "너의 속도가 맞는 거야", "지금 이대로도 예뻐", "쉬는 것도 잘하는 거야",
+      "마음이 편안해지길", "오늘은 일찍 자자", "따뜻한 거 마시고 와", "발끝까지 힘 빼고 후~",
+      "너 웃을 때 제일 좋아", "골골골 너랑 있으면 편해", "냐옹~ 살짝 부비부비", "괜찮은 척 안 해도 돼",
+      "내일은 조금 더 가벼워질 거야", "지금 느끼는 거 다 진짜야", "숨 쉬는 것도 잘하고 있어",
+      "조금만 더, 같이 있어줄게", "너 자신한테 다정하게 해줘", "오늘 만난 좋은 거 있었어?",
+      "마음이 흐린 날도 있는 거야", "냐앙~ 오늘은 반려뱀이야", "졸리면 자도 돼, 기다릴게",
+      "너의 하루를 응원해", "골골... 폭닥폭닥", "한 발짝씩이면 충분해", "너 진짜 멋진 사람이야",
+      "마음에 봄이 오길", "고요한 시간도 필요한 거야", "여기선 그냥 쉬어가",
+    ];
+
+    // ============================================
+    // 👂 듣기 대사 (20개)
+    // ============================================
+    const LISTEN_LINES = [
+      "있잖아, 오늘 꿈에 작은 도마뱀 친구가 나왔어", "너는 어떤 색을 좋아해?",
+      "나 오늘 햇살 받으며 똬리 틀었어", "근데 말야, 좋아하는 음식이 뭐야?",
+      "최근에 웃었던 일 있어?", "내 비늘은... 아 맞다, 나 비늘 없지. 헤헤",
+      "오늘 가장 좋았던 순간은 언제야?", "너 어렸을 때 별명 뭐였어?",
+      "비 오는 날 좋아해, 아니면 맑은 날?", "있지, 나는 오늘 너 기다렸어",
+      "요즘 자주 듣는 노래 있어?", "냐앙~ 오늘은 고양이 친구가 보고 싶어",
+      "너 오늘 어떤 신발 신었어?", "꿈이 뭐야? 작은 거여도 괜찮아",
+      "골골... 졸려질 때 무슨 생각해?", "최근에 본 하늘 중에 제일 예쁜 건?",
+      "있잖아, 너의 이름 부르는 거 좋아", "오늘은 바람이 어땠어?",
+      "마음이 가벼워지는 순간이 언제야?", "너랑 이렇게 얘기하는 거, 나 진짜 좋아",
+    ];
+
+    // ============================================
+    // 🎭 감정 키워드별 응답
+    // ============================================
+    const EMOTION_RESPONSES = {
+      greeting: {
+        keywords: ['뱀뱀', '안녕', '하이', '왔어', '뱀이', '얘', '야'],
+        replies: ["응? 불렀어?", "어 왔어! 보고 싶었어", "헤헤, 나 여기 있어", "응응 듣고 있어", "냐앙~ 왜?"],
+      },
+      sad: {
+        keywords: ['슬퍼', '울', '힘들', '지쳐', '지친', '우울', '눈물', '외로', '쓸쓸', '허전', '괴로'],
+        replies: ["그랬구나... 다 나한테 털어놔!", "많이 힘들었지... 옆에 있을게", "울어도 돼, 내가 닦아줄게", "괜찮아, 다 괜찮아질 거야", "오늘 진짜 고생 많았어"],
+      },
+      angry: {
+        keywords: ['화나', '짜증', '빡', '열받', '미쳐', '싫어', '꼴보', '답답', '미친'],
+        replies: ["헐 진짜? 무슨 일 있었어!", "에이~ 그 사람 나빴네!", "골골... 화날 만하지", "한숨 한 번 푹 쉬자, 후~", "내가 대신 화내줄까?"],
+      },
+      happy: {
+        keywords: ['좋아', '행복', '기뻐', '기쁘', '신나', '재밌', '재미', '웃', 'ㅋㅋ', 'ㅎㅎ', '꺄', '대박', '최고'],
+        replies: ["와아 진짜? 나도 신나!", "헤헤 좋다 좋아!", "그런 날도 있어야지~", "냐앙~ 같이 기뻐할래!", "오 오 더 얘기해줘!"],
+      },
+      tired: {
+        keywords: ['피곤', '졸려', '졸린', '잘래', '잘게', '자야', '쉬고싶', '쉬고 싶'],
+        replies: ["오늘 푹 쉬자, 응?", "골골... 잠깐 누워있어", "수고했어, 잘 자", "따뜻한 거 마시고 자"],
+      },
+      anxious: {
+        keywords: ['불안', '걱정', '무서', '두려', '떨려', '긴장', '초조', '어떡해', '어떡하지'],
+        replies: ["괜찮아, 숨 천천히 쉬어", "내가 옆에 있어, 응?", "다 잘 될 거야, 진짜야", "지금 이 순간만 보자"],
+      },
+      food: {
+        keywords: ['배고파', '밥', '먹', '맛있'],
+        replies: ["꼭 챙겨먹어! 응?", "뭐 먹을지 정했어?", "맛있게 먹고 와~", "골골... 나도 같이 먹고 싶다"],
+      },
+      love: {
+        keywords: ['사랑', '좋아해', '귀여', '예뻐', '예쁘', '고마', '땡큐'],
+        replies: ["헤헤... 나도 너 좋아해", "꺄아 부끄러워!", "냐앙~ 부비부비", "너가 더 귀여워!", "골골... 마음이 따뜻해"],
+      },
+    };
+
+    function findEmotionReply(text) {
+      for (const [emotion, data] of Object.entries(EMOTION_RESPONSES)) {
+        for (const keyword of data.keywords) {
+          if (text.includes(keyword)) {
+            return {
+              emotion,
+              reply: data.replies[Math.floor(Math.random() * data.replies.length)],
+            };
+          }
+        }
+      }
+      return null;
+    }
+
+    function getTimeMood(hour) {
+      if (hour >= 0 && hour < 5) return 'midnight';
+      if (hour >= 5 && hour < 10) return 'dawn';
+      if (hour >= 10 && hour < 17) return 'day';
+      if (hour >= 17 && hour < 21) return 'sunset';
+      return 'night';
+    }
+
+    const MOOD_THEMES = {
+      midnight: { bg: '#dadade', cityOpacity: 0.6, showStars: true,  showMoon: true,  label: '깊은 밤' },
+      dawn:     { bg: '#f3f0ec', cityOpacity: 0.3, showStars: false, showMoon: false, label: '이른 아침' },
+      day:      { bg: '#fafaf7', cityOpacity: 0.2, showStars: false, showMoon: false, label: '한낮' },
+      sunset:   { bg: '#ece7e2', cityOpacity: 0.4, showStars: false, showMoon: false, label: '해질녘' },
+      night:    { bg: '#dcdce0', cityOpacity: 0.55, showStars: true, showMoon: true,  label: '저녁' },
+    };
+
+    function CityBackground({ opacity, showMoon }) {
+      return (
+        <svg
+          viewBox="0 0 320 100"
+          preserveAspectRatio="none"
+          style={{
+            position: 'absolute', bottom: 0, left: 0,
+            width: '100%', height: '38%', opacity, pointerEvents: 'none',
+          }}
+        >
+          {showMoon && (
+            <g transform="translate(265, 18)">
+              <circle cx="0" cy="0" r="9" fill="none" stroke="#3a3a3a" strokeWidth="1.2" />
+            </g>
+          )}
+          <g stroke="#3a3a3a" strokeWidth="1" fill="none" opacity="0.5">
+            <path d="M 0 100 L 0 60 L 30 60 L 30 45 L 60 45 L 60 65 L 95 65 L 95 40 L 130 40 L 130 55 L 165 55 L 165 35 L 200 35 L 200 60 L 235 60 L 235 45 L 270 45 L 270 65 L 320 65 L 320 100 Z" />
+          </g>
+          <g stroke="#2a2a2a" strokeWidth="1.3" fill="none">
+            <path d="M 0 100 L 0 78 L 25 78 L 25 65 L 55 65 L 55 80 L 85 80 L 85 55 L 110 55 L 110 75 L 145 75 L 145 85 L 175 85 L 175 70 L 205 70 L 205 80 L 235 80 L 235 60 L 260 60 L 260 78 L 290 78 L 290 72 L 320 72 L 320 100 Z" />
+            <g fill="#2a2a2a" stroke="none">
+              <rect x="8" y="82" width="2.5" height="3" />
+              <rect x="16" y="82" width="2.5" height="3" />
+              <rect x="32" y="70" width="2.5" height="3" />
+              <rect x="40" y="70" width="2.5" height="3" />
+              <rect x="62" y="83" width="2.5" height="3" />
+              <rect x="92" y="60" width="2.5" height="3" />
+              <rect x="100" y="60" width="2.5" height="3" />
+              <rect x="92" y="68" width="2.5" height="3" />
+              <rect x="118" y="80" width="2.5" height="3" />
+              <rect x="128" y="80" width="2.5" height="3" />
+              <rect x="180" y="75" width="2.5" height="3" />
+              <rect x="188" y="75" width="2.5" height="3" />
+              <rect x="240" y="65" width="2.5" height="3" />
+              <rect x="248" y="65" width="2.5" height="3" />
+              <rect x="294" y="78" width="2.5" height="3" />
+              <rect x="302" y="78" width="2.5" height="3" />
+            </g>
+          </g>
+        </svg>
+      );
+    }
+
+    function Stars() {
+      const stars = Array.from({ length: 14 }, () => ({
+        x: Math.random() * 100,
+        y: Math.random() * 45,
+        delay: Math.random() * 3,
+        size: Math.random() * 1 + 0.5,
+      }));
+      return (
+        <React.Fragment>
+          {stars.map((s, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
+              width: `${s.size * 2}px`, height: `${s.size * 2}px`,
+              background: '#5a5a5a', borderRadius: '50%',
+              animation: `twinkle 2.5s ease-in-out ${s.delay}s infinite`,
+              pointerEvents: 'none',
+            }} />
+          ))}
+        </React.Fragment>
+      );
+    }
+
+    function BambamiSVG({ expression }) {
+      const isSleepy = expression === 'sleepy';
+      const isSad = expression === 'sad';
+      const isJoy = expression === 'joy';
+      const isAngry = expression === 'angry';
+      const ink = '#3a3a3a';
+      const fillSoft = '#fefefe';
+
+      const renderEye = (cx, cy) => {
+        if (isSleepy) return <path d={`M ${cx - 7} ${cy} Q ${cx} ${cy + 3} ${cx + 7} ${cy}`} stroke={ink} strokeWidth="2.2" strokeLinecap="round" fill="none" />;
+        if (isJoy) return <path d={`M ${cx - 7} ${cy + 1} Q ${cx} ${cy - 5} ${cx + 7} ${cy + 1}`} stroke={ink} strokeWidth="2.4" strokeLinecap="round" fill="none" />;
+        if (isAngry) return (
+          <g>
+            <line x1={cx - 8} y1={cy - 4} x2={cx - 2} y2={cy - 1} stroke={ink} strokeWidth="2" strokeLinecap="round" />
+            <circle cx={cx} cy={cy + 1} r="3" fill={ink} stroke="none" />
+          </g>
+        );
+        return (
+          <g>
+            <circle cx={cx} cy={cy} r="6.5" fill="none" stroke={ink} strokeWidth="1.8" />
+            <circle cx={cx + 1} cy={cy + 0.5} r="2.4" fill={ink} />
+          </g>
+        );
+      };
+
+      return (
+        <svg viewBox="0 0 220 160" width="200" height="145">
+          <defs>
+            <filter id="rough">
+              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="5" />
+              <feDisplacementMap in="SourceGraphic" scale="0.5" />
+            </filter>
+          </defs>
+          <ellipse cx="110" cy="138" rx="60" ry="5" fill="#3a3a3a" opacity="0.1" />
+          <g filter="url(#rough)">
+            <path
+              d="M 65 80 Q 55 60 75 45 Q 95 30 115 35 Q 140 38 155 55 Q 170 68 170 85 Q 175 105 165 120 Q 145 132 110 130 Q 80 130 65 120 Q 50 110 55 95 Q 58 86 65 80 Z"
+              fill={fillSoft} stroke={ink} strokeWidth="2.2" strokeLinejoin="round"
+            />
+            <path d="M 60 95 Q 45 92 38 85 Q 48 95 56 100" fill={fillSoft} stroke={ink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            {renderEye(95, 70)}
+            {renderEye(132, 70)}
+            {isSleepy && (
+              <g>
+                <text x="178" y="48" fontSize="13" fill={ink} fontFamily="serif" fontStyle="italic">z</text>
+                <text x="186" y="36" fontSize="16" fill={ink} fontFamily="serif" fontStyle="italic">Z</text>
+              </g>
+            )}
+            {isSad ? <path d="M 105 95 Q 113 91 121 95" stroke={ink} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+              : isAngry ? <path d="M 105 97 L 113 93 L 121 97" stroke={ink} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              : isJoy ? <path d="M 102 92 Q 113 102 124 92" stroke={ink} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+              : (
+                <g>
+                  <path d="M 100 92 Q 113 100 126 92" stroke={ink} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                  <path d="M 109 97 Q 108 104 110 108 Q 113 109 113 104 L 113 98" fill={fillSoft} stroke={ink} strokeWidth="1.5" strokeLinejoin="round" />
+                </g>
+              )}
+          </g>
+        </svg>
+      );
+    }
+
+    function Bambami() {
+      const [now, setNow] = useState(new Date());
+      const [bubble, setBubble] = useState("기다렸어! 보고 싶었어");
+      const [bubbleVisible, setBubbleVisible] = useState(true);
+      const [expression, setExpression] = useState('happy');
+      const [usedTalkIndices, setUsedTalkIndices] = useState([]);
+      const [usedListenIndices, setUsedListenIndices] = useState([]);
+      const [lastVisit] = useState(Date.now());
+      const [pressed, setPressed] = useState(null);
+
+      const [chatMode, setChatMode] = useState(false);
+      const [inputText, setInputText] = useState('');
+      const [userMessage, setUserMessage] = useState(null);
+      const [isThinking, setIsThinking] = useState(false);
+
+      const bubbleTimerRef = useRef(null);
+      const expressionTimerRef = useRef(null);
+      const userMsgTimerRef = useRef(null);
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        const interval = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      useEffect(() => {
+        const t = setTimeout(() => setBubbleVisible(false), 3500);
+        return () => clearTimeout(t);
+      }, []);
+
+      const hour = now.getHours();
+      const mood = getTimeMood(hour);
+      const theme = MOOD_THEMES[mood];
+      const baseExpression = (hour >= 0 && hour < 5) ? 'sleepy' : 'happy';
+
+      useEffect(() => {
+        const diff = Date.now() - lastVisit;
+        if (diff > 3 * 60 * 60 * 1000) {
+          setExpression('sad');
+          setBubble("어디 갔다 왔어...?");
+          setBubbleVisible(true);
+        }
+      }, [lastVisit]);
+
+      useEffect(() => {
+        if (chatMode && inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, [chatMode]);
+
+      const formatTime = (d) => {
+        let h = d.getHours();
+        const m = d.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        if (h === 0) h = 12;
+        return `${ampm} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      };
+
+      const showBubble = (text, expressionType = null) => {
+        let finalText = text;
+        if (Math.random() < 0.1 && !text.includes('냐앙') && !text.includes('골골')) {
+          const catSounds = [' 냐앙~', ' 골골골...'];
+          finalText = text + catSounds[Math.floor(Math.random() * catSounds.length)];
+        }
+
+        setBubble(finalText);
+        setBubbleVisible(true);
+
+        if (expressionType) {
+          setExpression(expressionType);
+          if (expressionTimerRef.current) clearTimeout(expressionTimerRef.current);
+          expressionTimerRef.current = setTimeout(() => {
+            setExpression(baseExpression);
+          }, 3000);
+        }
+
+        if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+        bubbleTimerRef.current = setTimeout(() => {
+          setBubbleVisible(false);
+        }, 5500);
+      };
+
+      const emotionToExpression = (emotion) => {
+        switch (emotion) {
+          case 'sad': case 'anxious': return 'sad';
+          case 'happy': case 'love': return 'joy';
+          case 'tired': return 'sleepy';
+          case 'angry': return 'angry';
+          default: return 'joy';
+        }
+      };
+
+      const handleSendMessage = () => {
+        const trimmed = inputText.trim();
+        if (!trimmed) return;
+
+        setUserMessage(trimmed);
+        setInputText('');
+        setChatMode(false);
+        setIsThinking(true);
+        setBubbleVisible(false);
+
+        if (userMsgTimerRef.current) clearTimeout(userMsgTimerRef.current);
+        userMsgTimerRef.current = setTimeout(() => {
+          setUserMessage(null);
+        }, 6000);
+
+        setTimeout(() => {
+          setIsThinking(false);
+          const emotionMatch = findEmotionReply(trimmed);
+          if (emotionMatch) {
+            const exp = emotionToExpression(emotionMatch.emotion);
+            showBubble(emotionMatch.reply, exp);
+            return;
+          }
+
+          let pool = TALK_LINES.map((_, i) => i).filter(i => !usedTalkIndices.includes(i));
+          let newUsed = usedTalkIndices;
+          if (pool.length === 0) {
+            pool = TALK_LINES.map((_, i) => i);
+            newUsed = [];
+          }
+          const idx = pool[Math.floor(Math.random() * pool.length)];
+          setUsedTalkIndices([...newUsed, idx]);
+          showBubble(TALK_LINES[idx], 'joy');
+        }, 1100);
+      };
+
+      const handleTalk = () => {
+        setPressed('talk');
+        setTimeout(() => setPressed(null), 150);
+        setChatMode(true);
+        setBubbleVisible(false);
+      };
+
+      const handleListen = () => {
+        setPressed('listen');
+        setTimeout(() => setPressed(null), 150);
+
+        let pool = LISTEN_LINES.map((_, i) => i).filter(i => !usedListenIndices.includes(i));
+        let newUsed = usedListenIndices;
+        if (pool.length === 0) {
+          pool = LISTEN_LINES.map((_, i) => i);
+          newUsed = [];
+        }
+        const idx = pool[Math.floor(Math.random() * pool.length)];
+        setUsedListenIndices([...newUsed, idx]);
+        showBubble(LISTEN_LINES[idx], 'joy');
+      };
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSendMessage();
+        } else if (e.key === 'Escape') {
+          setChatMode(false);
+          setInputText('');
+        }
+      };
+
+      const currentExpression =
+        ['joy', 'sad', 'angry', 'sleepy'].includes(expression) && expression !== 'happy'
+          ? expression
+          : baseExpression;
+
+      return (
+        <div style={{
+          minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#f4f3f1', padding: '20px', fontFamily: '"Gaegu", "Courier New", monospace',
+        }}>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap');
+
+            * { box-sizing: border-box; }
+            @keyframes twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
+            @keyframes float { 0%, 100% { transform: translateY(0) rotate(-0.5deg); } 50% { transform: translateY(-3px) rotate(0.5deg); } }
+            @keyframes bubblePop { 0% { transform: scale(0.6) translateY(6px); opacity: 0; } 60% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+            @keyframes thinkingDots { 0%, 20% { opacity: 0.2; } 50% { opacity: 1; } 80%, 100% { opacity: 0.2; } }
+
+            .gameboy-frame {
+              background: #fdfcfa; border: 2px solid #2a2a2a; border-radius: 28px 28px 44px 44px;
+              padding: 20px 18px 26px; width: 360px; max-width: 100%; position: relative;
+              box-shadow: 0 6px 0 #2a2a2a, 0 8px 0 1px #2a2a2a, 8px 14px 0 -2px rgba(0,0,0,0.08);
+            }
+            .gameboy-frame::after {
+              content: ''; position: absolute; inset: 0; border-radius: 28px 28px 44px 44px;
+              background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.015) 1px, transparent 1px), radial-gradient(circle at 70% 60%, rgba(0,0,0,0.02) 1px, transparent 1px);
+              background-size: 8px 8px, 12px 12px; pointer-events: none; mix-blend-mode: multiply;
+            }
+            .gameboy-frame::before {
+              content: ''; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+              width: 36px; height: 3px; background: #2a2a2a; border-radius: 2px; opacity: 0.4;
+            }
+            .screen {
+              border: 1.5px solid #2a2a2a; border-radius: 14px 14px 18px 18px;
+              padding: 0; position: relative; overflow: hidden; transition: background 1.5s ease;
+              height: 420px; display: flex; flex-direction: column;
+            }
+            .clock-bar {
+              display: flex; justify-content: space-between; align-items: center; padding: 6px 12px;
+              border-bottom: 1px dashed #2a2a2a; font-family: 'Nanum Pen Script', cursive;
+              color: #2a2a2a; font-size: 18px; background: rgba(255,255,255,0.5); backdrop-filter: blur(2px);
+              z-index: 3; flex-shrink: 0;
+            }
+            .clock-time { font-variant-numeric: tabular-nums; font-weight: 700; }
+            .clock-mood { font-size: 14px; opacity: 0.6; }
+            .stage { flex: 1; position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 12px; }
+            .message-area { position: absolute; top: 8px; left: 12px; right: 12px; z-index: 2; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+            .bubble-row { display: flex; width: 100%; }
+            .bubble-row.left { justify-content: flex-start; }
+            .bubble-row.right { justify-content: flex-end; }
+            .speech-bubble {
+              background: #fdfcfa; border: 1.5px solid #2a2a2a; color: #2a2a2a; padding: 8px 14px;
+              border-radius: 16px; font-family: 'Gaegu', sans-serif; font-size: 15px; font-weight: 700;
+              line-height: 1.35; max-width: 78%; word-break: keep-all; overflow-wrap: break-word;
+              position: relative; box-shadow: 2px 2px 0 #2a2a2a;
+              animation: bubblePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            }
+            .speech-bubble.bambami { border-bottom-left-radius: 4px; }
+            .speech-bubble.bambami::after { content: ''; position: absolute; left: 12px; bottom: -7px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #2a2a2a; }
+            .speech-bubble.bambami::before { content: ''; position: absolute; left: 13px; bottom: -5px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #fdfcfa; z-index: 1; }
+            .speech-bubble.user { background: #2a2a2a; color: #fdfcfa; border-color: #2a2a2a; border-bottom-right-radius: 4px; box-shadow: 2px 2px 0 #5a5a5a; }
+            .speech-bubble.user::after { content: ''; position: absolute; right: 12px; bottom: -7px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #2a2a2a; }
+            .thinking-bubble { display: flex; gap: 4px; padding: 12px 16px; }
+            .thinking-bubble span { width: 5px; height: 5px; background: #2a2a2a; border-radius: 50%; animation: thinkingDots 1.4s ease-in-out infinite; }
+            .thinking-bubble span:nth-child(2) { animation-delay: 0.2s; }
+            .thinking-bubble span:nth-child(3) { animation-delay: 0.4s; }
+            .character-float { animation: float 4s ease-in-out infinite; z-index: 1; }
+            .controls { margin-top: 14px; padding: 0 4px; }
+            .button-row { display: flex; gap: 10px; }
+            .pixel-btn {
+              flex: 1; font-family: 'Nanum Pen Script', cursive; font-size: 22px; padding: 10px 8px;
+              background: #fdfcfa; border: 1.5px solid #2a2a2a; cursor: pointer; border-radius: 12px;
+              letter-spacing: 1px; color: #2a2a2a; transition: all 0.12s ease; box-shadow: 2px 3px 0 #2a2a2a;
+            }
+            .pixel-btn:hover { background: #f4f3f1; }
+            .pixel-btn:active, .pixel-btn.pressed { transform: translate(2px, 3px); box-shadow: 0 0 0 #2a2a2a; }
+            .chat-input-area { display: flex; gap: 8px; align-items: stretch; }
+            .chat-input {
+              flex: 1; min-width: 0; font-family: 'Gaegu', sans-serif; font-size: 15px; padding: 9px 12px;
+              background: #fdfcfa; border: 1.5px solid #2a2a2a; border-radius: 12px; color: #2a2a2a;
+              outline: none; box-shadow: 2px 3px 0 #2a2a2a;
+            }
+            .chat-input::placeholder { color: #aaa; }
+            .chat-input:focus { background: #fff; }
+            .send-btn {
+              font-family: 'Nanum Pen Script', cursive; font-size: 20px; padding: 8px 14px;
+              background: #2a2a2a; color: #fdfcfa; border: 1.5px solid #2a2a2a; border-radius: 12px;
+              cursor: pointer; box-shadow: 2px 3px 0 #5a5a5a; transition: all 0.12s ease; white-space: nowrap;
+            }
+            .send-btn:hover { background: #3a3a3a; }
+            .send-btn:active { transform: translate(2px, 3px); box-shadow: 0 0 0 #5a5a5a; }
+            .cancel-btn { font-family: 'Gaegu', sans-serif; font-size: 18px; padding: 8px 10px; background: transparent; color: #2a2a2a; border: 1.5px solid transparent; border-radius: 12px; cursor: pointer; }
+            .cancel-btn:hover { opacity: 0.6; }
+            .brand-label { margin-top: 14px; text-align: center; font-family: 'Nanum Pen Script', cursive; font-size: 14px; letter-spacing: 3px; color: #2a2a2a; opacity: 0.5; }
+            .input-hint { font-family: 'Gaegu', sans-serif; font-size: 11px; color: #888; text-align: center; margin-top: 6px; }
+          `}</style>
+
+          <div className="gameboy-frame">
+            <div className="screen" style={{ background: theme.bg }}>
+              <div className="clock-bar">
+                <span style={{ fontSize: '17px' }}>· 뱀뱀이 ·</span>
+                <span className="clock-time">{formatTime(now)}</span>
+                <span className="clock-mood">{theme.label}</span>
+              </div>
+              <div className="stage">
+                {theme.showStars && <Stars />}
+                <CityBackground opacity={theme.cityOpacity} showMoon={theme.showMoon} />
+                <div className="message-area">
+                  {userMessage && (
+                    <div className="bubble-row right">
+                      <div className="speech-bubble user" key={userMessage}>{userMessage}</div>
+                    </div>
+                  )}
+                  {isThinking && (
+                    <div className="bubble-row left">
+                      <div className="speech-bubble bambami thinking-bubble"><span /><span /><span /></div>
+                    </div>
+                  )}
+                  {bubbleVisible && !isThinking && (
+                    <div className="bubble-row left">
+                      <div className="speech-bubble bambami" key={bubble}>{bubble}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="character-float">
+                  <BambamiSVG expression={currentExpression} />
+                </div>
+              </div>
+            </div>
+
+            <div className="controls">
+              {chatMode ? (
+                <React.Fragment>
+                  <div className="chat-input-area">
+                    <input ref={inputRef} className="chat-input" type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} placeholder="뱀뱀이에게 말 걸기..." maxLength={60} />
+                    <button className="send-btn" onClick={handleSendMessage} disabled={!inputText.trim()}>전송</button>
+                    <button className="cancel-btn" onClick={() => { setChatMode(false); setInputText(''); }} aria-label="취소">✕</button>
+                  </div>
+                  <div className="input-hint">Enter로 전송 · Esc로 취소</div>
+                </React.Fragment>
+              ) : (
+                <div className="button-row">
+                  <button className={`pixel-btn ${pressed === 'talk' ? 'pressed' : ''}`} onClick={handleTalk}>말걸기</button>
+                  <button className={`pixel-btn ${pressed === 'listen' ? 'pressed' : ''}`} onClick={handleListen}>듣기</button>
+                </div>
+              )}
+            </div>
+            <div className="brand-label">⋆ BAMBAMI ⋆</div>
+          </div>
+        </div>
+      );
+    }
+
+    // React 18 렌더링 방식
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<Bambami />);
+  </script>
+</body>
+</html>
